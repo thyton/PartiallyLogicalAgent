@@ -1,0 +1,9 @@
+rm -r ./bin/pyPL;
+python -m compileall ./*.py
+mv -f __pycache__/*-37.pyc bin/
+for file in bin/*; do mv -f $file ${file%%.*}.pyc; done
+
+mkdir ./bin/pyPL
+python -m compileall ./pyPL/*.py
+mv -f ./pyPL/__pycache__/*-37.pyc bin/pyPL/
+for file in bin/pyPL/*; do mv -f $file ${file%%.*}.pyc; done

@@ -1,0 +1,6 @@
+pyPL/*
+__pycache__/*
+env/*
+bin/*
+.DS_Store
+
