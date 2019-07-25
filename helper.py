@@ -9,10 +9,7 @@ class Act(Enum) :
 	SHOOT_ARROW = -100
 	DIE = -10000 
 	EXIT_CAVE = 0
-	UP = 1
-	DOWN = 1
-	LEFT = 1
-	RIGHT = 1
+	STEP = 1
 
 def neighbors(x, y, w, h):
 	neis = []
@@ -51,6 +48,8 @@ def initRules(w,h):
 			pit =  makePerceptSentence("P",x,y)
 			# rules for ok square 
 			rules = rules.cAnd(makePerceptSentence("OK",x,y).cImp((~wumpus).cAnd(~pit)))
+			# pit and wumpus can't be at the same position
+			rules = rules.cAnd(wumpus.cImp(~pit))
 			for x,y in neighbors(x, y, w, h):
 				# rules for stench and Wumpus
 				stench =  makePerceptSentence("S",x,y)
@@ -83,5 +82,5 @@ def pCNF(cnf):
 	for clause in cnf:
 		print(str([str(u) for u in list(clause)]))
 
-def distance(p1, p2):
+def distance(p0, p1):
 	return sqrt( (p0[0]-p1[0])*(p0[0]-p1[0]) + (p0[1]-p1[1])*(p0[1]-p1[1]) )
