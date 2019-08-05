@@ -1,8 +1,16 @@
-import sys
-sys.path.append('../')
+"""
+helper functions for package logicalAgent
+Thy Ton
+"""
 from pyPL import *
 from math import sqrt
 from enum import Enum
+class Percept(Enum):
+	G = 5 
+	W = 4
+	P = 3
+	S = 2
+	B = 1
 
 class Act(Enum) :
 	GRAB_GOLD = 100
@@ -24,6 +32,9 @@ def neighbors(x, y, w, h):
 	return neis
 
 def makePerceptSentence(percept, x, y):
+	""" 
+		Return an atomic sentence represent percept at x, y
+	"""
 	return AtomicSentence(True, percept + str(x)+"_"+str(y))
 
 def initRules(w,h):
@@ -44,19 +55,44 @@ def initRules(w,h):
 	rules = AtomicSentence(True, "True")
 	for x in range(1, w+1):
 		for y in range(1, h+1):
-			wumpus =  makePerceptSentence("W",x,y)
-			pit =  makePerceptSentence("P",x,y)
-			# rules for ok square 
-			rules = rules.cAnd(makePerceptSentence("OK",x,y).cImp((~wumpus).cAnd(~pit)))
-			# pit and wumpus can't be at the same position
-			rules = rules.cAnd(wumpus.cImp(~pit))
-			for x,y in neighbors(x, y, w, h):
-				# rules for stench and Wumpus
-				stench =  makePerceptSentence("S",x,y)
-				rules = rules.cAnd(wumpus.cImp(stench))
-				# rules for breeze and pit
-				breeze =  makePerceptSentence("B",x,y)
-				rules = rules.cAnd(pit.cImp(breeze))
+			xyWumpus =  makePerceptSentence("W",x,y)
+			xyPit =  makePerceptSentence("P",x,y)
+			# # rules for ok square 
+			# rules = rules.cAnd(makePerceptSentence("OK",x,y).cImp((~xyWumpus).cAnd(~xyPit)))
+			# xyPit and xyWumpus can't be at the same position
+			rules = rules.cAnd(xyWumpus.cImp(~xyPit))
+			for neiX, neiY in neighbors(x, y, w, h):
+				# rules for stench and xyWumpus
+				stench =  makePerceptSentence("S",neiX,neiY)
+				rules = rules.cAnd(xyWumpus.cImp(stench))
+				# rules for breeze and xyPit
+				breeze =  makePerceptSentence("B",neiX,neiY)
+				rules = rules.cAnd(xyPit.cImp(breeze))
+	cnf = rules.cnf()	
+	return KnowledgeBase(cnf)
+
+def atLeastRules(w,h):
+	rules = AtomicSentence(True, "True")
+	for x in range(1, w+1):
+		for y in range(1, h+1):
+			xyBreeze = makePerceptSentence("B",x,y)
+			xyStench = makePerceptSentence("S",x,y)
+			neiPits = None
+			neiWumpuses = None
+			for neiX, neiY in neighbors(x, y, w, h):
+				# inclusive or the xy's neighbors is Pit
+				if neiPits == None:
+					neiPits = makePerceptSentence("P",neiX,neiY)
+				else:
+					neiPits = neiPits.cOr(makePerceptSentence("P",neiX,neiY))
+
+				# inclusive or the xy's neighbors is Wumpus
+				if neiWumpuses == None:
+					neiWumpuses = makePerceptSentence("W",neiX,neiY)
+				else:
+					neiWumpuses = neiWumpuses.cOr(makePerceptSentence("W",neiX,neiY))
+		rules = rules.cAnd(xyBreeze.cImp(neiPits))
+		rules = rules.cAnd(xyStench.cImp(neiWumpuses))
 	cnf = rules.cnf()	
 	return KnowledgeBase(cnf)
 
@@ -76,6 +112,7 @@ def readProblem(file):
 			if i > 1:
 				key += l[i]
 		problem[(int(l[0]), int(l[1]))] = set(key)
+	print(problem)
 	return problem	
 
 def pCNF(cnf):
