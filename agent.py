@@ -16,11 +16,17 @@ class State(Enum):
 class Agent:
 	def __init__(self, w, h):
 		self.size = w, h
-		self.kb = initRules(w,h)	# knowledge base 
-		self.score = 0 				# score
-		self.p = 1, 1				# position
+		self.kb = initRules(w,h)							# knowledge bas
+		"""
+			akb represents at least knowledge base, helping agent using the rule
+			that if the agent smells stench, there is at least one wumpus nearby.
+			The same rulle is applied to pit and breeze. 
+		""" 
+		self.akb = atLeastRules(w,h) 						
+		self.score = 0 										# score
+		self.p = 1, 1										# position
 
-		self.moveCnt = 150              # allowance for move cnt
+		self.moveCnt = 150              					# allowance for move cnt
 		self.worldState = {} 
 		self.unvisited = set()
 		self.ok = set()
@@ -30,7 +36,10 @@ class Agent:
 				self.unvisited.add((x,y))
 		self.plan = []
 		self.adjList = {}
-		print(self.kb)
+		self.steps = []
+		print("self.kb", self.kb)
+		print("self.akb", self.akb)
+		print("self.unvisited", self.unvisited)
 	def pCNF(self, kb):
 		for clause in kb:
 			print(str([str(u) for u in list(clause)]))
@@ -50,18 +59,21 @@ class Agent:
 		# sentences for those are not in current percepts	
 		notPercepts = [p for p in world.percepts if p not in percepts]
 		for p in notPercepts:
-			neis = neighbors(self.p[0], self.p[1], self.size[0], self.size[1])
+			neis = neighbors(*self.p, *self.size)
 			if p == "B":
 				[self.worldState[nei].remove("PP") for nei in neis if "PP" in self.worldState[nei]] 
 			if p == "S":
 				[self.worldState[nei].remove("PW") for nei in neis if "PW" in self.worldState[nei]] 
 			pSentences = pSentences.cAnd(~makePerceptSentence(p, self.p[0], self.p[1]))
+		
+		# add the percepts to the current knowledge base
 		cnf = pSentences.cnf()
-		# for clause in cnf:
-		# 	print(str([str(u) for u in list(clause)]))
 		self.kb.extend(cnf)
 
 	def constructGraph(self, allowed):
+		"""
+			construct adjajency list for each allowed squares
+		"""
 		adjList = {}
 		for u in allowed:
 			adjList[u] = []
@@ -78,12 +90,16 @@ class Agent:
 		if len(self.plan) == 0:
 			# visits the closest safe unvisited square
 			goals = set([u for u in self.unvisited if u in self.ok])
-			print("safe unvisited from self.p", self.p , goals)
+			print("goals", goals)
+			# print("safe unvisited from self.p", self.p , goals)
 			if len(goals) > 0:
 				adjList = self.constructGraph(self.ok)
 				result = aStarSearch(self.p, goals, adjList)
 				self.p = result['steps'][-1]
 				self.plan.extend(result['plan'])
+
+				# agent steps toward the future self.p
+				self.steps = result['steps']
 
 		if len(self.plan) == 0:
 			# go where there is a possible wumpus but not a possible pit
@@ -95,7 +111,10 @@ class Agent:
 				self.p = result['steps'][-1]
 				self.plan.extend(result['plan'])
 				self.plan.append(Act.SHOOT_ARROW)
-				
+
+				# agent steps toward the future self.p
+				self.steps = result['steps']
+
 				# remove the possible wumpus tag from the shoot place
 				self.worldState[self.p].remove("PW")
 
@@ -107,12 +126,11 @@ class Agent:
 			# go where it is not safe, taking risk
 			for u in self.unvisited:
 				goals = set()
-				notOKSentence = ~(makePerceptSentence("OK", u[0], u[1]))
-				print("not ok sentence", notOKSentence)
-				notOK = resolution(self.kb, notOKSentence)
+				notOKSentence = (makePerceptSentence("W", u[0], u[1])).cOr(makePerceptSentence("P", u[0], u[1]))
+				kb = copy.deepcopy(self.kb)
+				kb.extend(self.akb.c)
+				notOK = resolution(kb, notOKSentence)
 				if not notOK:
-					print("not ok sentence")
-					print(u)
 					goals.add(u)
 			if len(goals) > 0:
 				allowed = copy.deepcopy(self.ok).union(goals)
@@ -120,15 +138,23 @@ class Agent:
 				result = aStarSearch(self.p, goals, adjList)
 				self.p = result['steps'][-1]
 				self.plan.extend(result['plan'])
+				
+				# agent steps toward the future self.p
+				self.steps = result['steps']
 
 				# update the knowledge base of current place
-				ok = (makePerceptSentence("OK", self.p[0], self.p[1]))
-				self.kb.extend(ok.cnf())
+				# ok = (makePerceptSentence("OK", self.p[0], self.p[1]))
+				# self.kb.extend(ok.cnf())
 
 		if len(self.plan) == 0:
 			adjList = self.constructGraph(self.ok)
 			result = aStarSearch(self.p, {(1,1)}, adjList)
+
 			self.p = result['steps'][-1]
+
+			# agent steps toward the future self.p
+			self.steps = result['steps']
+
 			self.plan.extend(result['plan'])
 			self.plan.append(Act.EXIT_CAVE)	
 
@@ -160,9 +186,9 @@ class Agent:
 		return actions
 
 	def act(self):
-		print("before act's plan", self.plan)
 		result = {}
 		perceptsToRemove = { }
+		result['steps'] = self.steps 
 		# tell if the agent wants to exit
 		result['exit'] = self.plan[-1] == Act.EXIT_CAVE 
 		while len(self.plan) > 0:
@@ -171,21 +197,23 @@ class Agent:
 			elif self.plan[0] == Act.GRAB_GOLD:
 				perceptsToRemove["G"] = self.p
 				self.pickGold()
+				result['steps'].append(self.plan[0])
 			elif self.plan[0] == Act.SHOOT_ARROW:
 				perceptsToRemove["W"] = self.p
 				self.shootArrow()
+				result['steps'].append(self.plan[0])
 			self.plan.pop(0)
 		result['perceptsToRemove'] = perceptsToRemove
+
 		return result
 
 	def do(self, world):
+		self.steps = []
 		self.updateKB(world)
 		self.updateWorldState()
-		print(self.kb)
-		print("unvisited", self.unvisited)
-		print("ok", self.ok)
 		self.makePlan(world)
 		return self.act()
+		
 	# def moveUp(self):
 	# 	self.p[1] += 1 
 
