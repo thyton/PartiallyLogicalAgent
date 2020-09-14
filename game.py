@@ -34,10 +34,10 @@ bottomMarginY = axisW + (margin + sqrSide)*h + margin
 
 # percept bar below the grid's bottom margin
 percBarX = axisW
-percBarY = bottomMarginY + gridBottomMargin
+percBarY = bottomMarginY + gridBottomMargin + 20
 
 # init screen
-screenW, screenH  = 800, 600
+screenW, screenH  = 600, 500
 pg.init()
 screen = pg.display.set_mode((screenW, screenH))
 screen.fill(black)
@@ -189,8 +189,8 @@ def smoothMoveImage(img, oldX, oldY, x, y, color):
 			pg.display.update()
 
 
-def showTextLine(words, startX, startY, lineW, lineSpace, color):
-	spaceW = font.size(' ')[0]
+def showTextLine(words, startX, startY, lineW, linespace, color):
+	spaceW = font.size(' ')[0] 
 	k = 1
 	funcRunning = True
 	x = startX
@@ -207,9 +207,10 @@ def showTextLine(words, startX, startY, lineW, lineSpace, color):
 				x = startX
 				y += wordH
 			screen.blit(wordSurface, (x, y))
-			x += wordW + spaceW
+			x += wordW
 		pg.display.update()
 		funcRunning = False
+	return x
 
 axisFont = pg.font.SysFont(("Narrow Arial"),30)
 wordH = axisFont.size(str("1"))[1]
@@ -217,11 +218,11 @@ vertMarginWord = (axisW - wordH)/2
 for x in range(1, w+1):
 	wordW = axisFont.size(str(x))[0]
 	horMarginWord = (axisW - wordW)/2
-	showTextLine(str(x), axisW + (x-1)*sqrSide + margin + horMarginWord , axisW - wordH - vertMarginWord, sqrSide, 5, blue)
+	showTextLine(str(x), axisW + (x-1)*sqrSide + margin + horMarginWord , axisW - wordH - vertMarginWord, sqrSide, 2, blue)
 for y in range(1, h+1):
 	wordW = axisFont.size(str(y))[0]
 	horMarginWord = (axisW - wordW)/2
-	showTextLine(str(y), horMarginWord, axisW + (y-1)*sqrSide + margin + vertMarginWord, sqrSide, 5, blue)
+	showTextLine(str(y), horMarginWord, axisW + (y-1)*sqrSide + margin + vertMarginWord, sqrSide, 2, blue)
 
 # draw grid
 for x in range(1, h + 1):
@@ -229,33 +230,46 @@ for x in range(1, h + 1):
 		showRect(white, *realXY(x, y), sqrSide, sqrSide)
 
 # percept bar top margin
-showRect(blue, bottomMarginX, bottomMarginY, bottomMarginY-axisW, gridBottomMargin)
+showRect(blue, bottomMarginX, bottomMarginY+20, bottomMarginY-axisW, gridBottomMargin)
 # title for percept bar
-wordH = pg.font.SysFont(("Narrow Arial"),25).size(str("Current percepts"))[1]
-showTextLine(str("Current percepts"), percBarX, percBarY, screenW - axisW, 5, white)
+wordH = pg.font.SysFont(("Narrow Arial"),25).size(str("Current percept"))[1]
+linespace = 5
+showTextLine("Current percept", percBarX, percBarY, screenW - axisW, linespace, white)
 percBarY += wordH + 5
 
 # score bar top margin
-scoreBarY = percBarY + sqrSide
+scoreBarY = percBarY + sqrSide + 20
 showRect(blue, bottomMarginX, scoreBarY, bottomMarginY-axisW, gridBottomMargin)
 # title for percept bar
 scoreBarY += gridBottomMargin
-showTextLine(str("Score"), bottomMarginX, scoreBarY, screenW - axisW, 5, white)
+showTextLine("Achievement Score", bottomMarginX, scoreBarY, screenW - axisW, linespace, white)
 scoreBarY += wordH + 5 
 
 # score bar top margin
-moveBarY = scoreBarY + wordH
+moveBarY = scoreBarY + wordH + 20
 showRect(blue, bottomMarginX, moveBarY, bottomMarginY-axisW, gridBottomMargin)
+
 # title for score bar
 moveBarY += gridBottomMargin
-showTextLine(str("Move count"), bottomMarginX, moveBarY, screenW - axisW, 5, white)
+showTextLine(str("Total Steps"), bottomMarginX, moveBarY, screenW - axisW, linespace, white)
 moveBarY += wordH + 5 
-showTextLine(str(0), axisW + margin, moveBarY, bottomMarginY-axisW, 2, blue)
+showTextLine(str(0), axisW + margin, moveBarY, bottomMarginY-axisW, linespace, blue)
+
+# score chart
+scoreChartL = 140
 
 # steps bar
-stepsBarW = 200
+stepsBarW = 330
 stepsBarX = screenW - stepsBarW
-stepsBarY = 0
+stepsBarY = scoreChartL
+
+showTextLine("Score Chart", stepsBarX, 2, stepsBarW, 1, white)
+showTextLine("Grab gold: +"+ str(Act.GRAB_GOLD.value), stepsBarX, (wordH + linespace)*1, stepsBarW, 1, blue)
+showTextLine("Shoot an arrow: "+ str(Act.SHOOT_ARROW.value), stepsBarX, (wordH + linespace)*2, stepsBarW, 1, blue)
+showTextLine("Die: "+ str(Act.DIE.value), stepsBarX, (wordH + linespace)*3, stepsBarW, 1, blue)
+showRect(blue, stepsBarX, 4*wordH + 5*linespace, bottomMarginY-axisW, gridBottomMargin)
+
+showTextLine("Calculated Plan:", stepsBarX, 4*wordH + 5*linespace + gridBottomMargin + 3, stepsBarW, 2, white)
 
 a = Agent(h, w)
 moveCnt = 0
@@ -278,50 +292,51 @@ while running:
 	if running:
 		result = a.do(world)
 		# erase the image from at the previous location				
-		showRect(black, stepsBarX, 0, screenW - stepsBarX, screenH)
+		showRect(black, stepsBarX, scoreChartL, screenW - stepsBarX, screenH - scoreChartL)
 		wordH = font.size('s')[1]
-		lineSpace = 2
 		y = stepsBarY 
 		agentMoves = False
 		oldXY, newXY = 0,0
-		if len(result['steps']) > 1:
-			showTextLine("Route:".split(" "), stepsBarX,y, stepsBarW, lineSpace, white)
-			y += wordH + lineSpace
+		nextStepTextX = stepsBarX
 		for i in range(len(result['steps'])):
 			if result['steps'][i] == Act.SHOOT_ARROW:
-				text = "Shoot an arrow at current position"
-				showTextLine(text.split(" "), stepsBarX, y, stepsBarW, lineSpace, white)
+				text = "Shoot an arrow"
+				showTextLine(text, stepsBarX, y, stepsBarW, linespace, blue)
 			elif result['steps'][i] == Act.GRAB_GOLD:
-				text = "Pick up gold at the current position"
-				showTextLine(text.split(" "), stepsBarX, y, stepsBarW, lineSpace, white)
+				text = "Grab the gold"
+				showTextLine(text, stepsBarX, y, stepsBarW, linespace, blue)
 				# we don't display actions other than steps of agent
 			elif i < len(result['steps']) - 1 and not isinstance(result['steps'][i+1], Act):
-				text = str(result['steps'][i])+" -> "+str(result['steps'][i+1])
 				oldXY = realXY(*result['steps'][i])
 				newXY = realXY(*result['steps'][i + 1])
+				text = " -> "+str(result['steps'][i+1])
+				if nextStepTextX == stepsBarX:	
+					text = "Step " + str(result['steps'][i]) + text
+				elif nextStepTextX < screenW - 100:
+					y -= wordH
+				else:
+					nextStepTextX = stepsBarX + 25
 				agentMoves = True
-				showTextLine(text.split(" "), stepsBarX, y, stepsBarW, lineSpace, white)
+				nextStepTextX = showTextLine(text, nextStepTextX, y, stepsBarW, linespace, blue)
 			pg.display.update()
 			x = stepsBarX
-			y += wordH + lineSpace
+			y += wordH 
 
 			if agentMoves:
 				smoothMoveImage(images["A"], *oldXY, *newXY, blue)
 				moveCnt += 1
 				showRect(black, axisW + margin, moveBarY, bottomMarginY-axisW, scoreH)	
-				showTextLine(str(moveCnt), axisW + margin, moveBarY, bottomMarginY-axisW, lineSpace, blue)
+				showTextLine(str(moveCnt), axisW + margin, moveBarY, bottomMarginY-axisW, linespace, blue)
 				agentMoves = False
 
 		scoreH = pg.font.SysFont(("Narrow Arial"),25).size(str("Score"))[1]
 		showRect(black, axisW + margin, scoreBarY, bottomMarginY-axisW, scoreH)	
-		showTextLine(str(a.score), axisW + margin, scoreBarY, stepsBarW, lineSpace, blue)
+		showTextLine(str(a.score), axisW + margin, scoreBarY, stepsBarW, linespace, blue)
 		s = ""
 		for percept, position in result['perceptsToRemove'].items():
 			if percept in problem[position]:
 				problem[position].remove(percept)
 				s += percept + " "
-		print("-")
-		print(s)
 		print(result)
 
 		running = not result['exit']
